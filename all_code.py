@@ -14,14 +14,13 @@
 import os
 import argparse
 import sys
-import tkinter as tk
-import tkinter.messagebox as messagebox
+import shutil
 import subprocess
 
 # Define the master file name
 FULL_CODE_FILE_NAME = "full_code.txt"
 
-FILES_TO_INCLUDE = {}  # if empty, include all files
+FILES_TO_INCLUDE = set()  # if empty, include all files
 EXCLUDE_EXTENSIONS = set()  # User-defined extensions to exclude
 
 # FILES_TO_INCLUDE = {
@@ -29,7 +28,7 @@ EXCLUDE_EXTENSIONS = set()  # User-defined extensions to exclude
 #     'another_file.js',
 # }
 
-# Define programming-related file extensions (removed '.json' and '.md')
+# Define programming-related file extensions
 PROGRAMMING_EXTENSIONS = {
     # General Programming Languages
     '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.vb', '.r', 
@@ -48,11 +47,14 @@ PROGRAMMING_EXTENSIONS = {
     '.xml', '.json', '.toml', '.ini', '.yml', '.yaml', '.md', '.rst',
 
     # Build & Make Systems
-    '.Makefile', '.gradle', '.cmake', '.ninja',
+    '.gradle', '.cmake', '.ninja',
 
     # Other
     '.pqm', '.pq'
 }
+
+# Filenames that should be treated as programming files even without extensions
+SPECIAL_FILENAMES = {'Makefile'}
 
 # Define directories to exclude during file aggregation and directory tree generation
 EXCLUDE_DIRS = {
@@ -117,6 +119,8 @@ def generate_directory_tree(startpath):
 
 def is_programming_file(filename):
     """Checks if a file has a programming-related extension and is not in the exclude list."""
+    if filename in SPECIAL_FILENAMES:
+        return True
     _, ext = os.path.splitext(filename)
     ext = ext.lower()
     return ext in PROGRAMMING_EXTENSIONS and ext not in EXCLUDE_EXTENSIONS
@@ -184,11 +188,21 @@ def parse_arguments():
                     help="Comma-separated list of file extensions to exclude.")
     return parser.parse_args()
 
-# TODO: Works on Macos. Needs Windows and Linux support
 def copy_to_clipboard(content):
+    """Copy text to the system clipboard in a cross-platform manner."""
     try:
-        process = subprocess.Popen('pbcopy', env={'LANG': 'en_US.UTF-8'}, stdin=subprocess.PIPE)
-        process.communicate(content.encode('utf-8'))
+        if sys.platform == "darwin":
+            subprocess.run(["pbcopy"], input=content.encode("utf-8"), check=True)
+        elif sys.platform.startswith("win"):
+            subprocess.run("clip", input=content, text=True, shell=True, check=True)
+        else:
+            if shutil.which("xclip"):
+                subprocess.run(["xclip", "-selection", "clipboard"], input=content.encode("utf-8"), check=True)
+            elif shutil.which("xsel"):
+                subprocess.run(["xsel", "-b", "-i"], input=content.encode("utf-8"), check=True)
+            else:
+                print("Error: Install xclip or xsel to enable clipboard functionality.")
+                return False
         return True
     except Exception as e:
         print(f"Error copying to clipboard: {e}")
@@ -214,20 +228,16 @@ def main():
         EXCLUDE_DIRS = {d.strip() for d in args.exclude_dirs.split(',') if d.strip()}
         
     if args.exclude_extensions:
-        EXCLUDE_EXTENSIONS = {ext.strip() for ext in args.exclude_extensions.split(',') if ext.strip()}
+        EXCLUDE_EXTENSIONS = {ext.strip().lower() for ext in args.exclude_extensions.split(',') if ext.strip()}
 
-
-    # Debugging print statement to verify exclusions
-    print(f"Excluding extensions: {EXCLUDE_EXTENSIONS}")
     startpath = args.directory
 
     if not os.path.isdir(startpath):
         print(f"Error: The specified directory '{startpath}' does not exist or is not a directory.")
         sys.exit(1)
 
-    if not os.path.isdir(startpath):
-        print(f"Error: The specified directory '{startpath}' does not exist or is not a directory.")
-        sys.exit(1)
+    if EXCLUDE_EXTENSIONS:
+        print(f"Excluding extensions: {EXCLUDE_EXTENSIONS}")
 
     # Generate directory tree
     directory_tree = generate_directory_tree(startpath)
