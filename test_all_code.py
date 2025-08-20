@@ -108,6 +108,29 @@ def test_include_files():
         print("test_include_files passed.")
 
 
+def test_include_files_different_cwd():
+    """Ensure --include-files works when run from a directory different from the source."""
+    with tempfile.TemporaryDirectory() as source_dir:
+        # Create one Python file that we want to explicitly include.
+        file_path = os.path.join(source_dir, "dummy.py")
+        with open(file_path, "w") as f:
+            f.write("print('Hello from dummy')")
+
+        # Run the script from a separate working directory while specifying
+        # the source directory via -d. Without the fix, the include filter
+        # would fail because paths were computed relative to the working
+        # directory.
+        with tempfile.TemporaryDirectory() as working_dir:
+            run_script(["-d", source_dir, "-i", "dummy.py"], cwd=working_dir)
+            output_file = os.path.join(working_dir, "full_code.txt")
+            with open(output_file, "r") as f:
+                content = f.read()
+
+        assert "print('Hello from dummy')" in content, (
+            "dummy.py should be included even when running from a different cwd"
+        )
+        print("test_include_files_different_cwd passed.")
+
 def test_extensions():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create one .py file and one .txt file.
