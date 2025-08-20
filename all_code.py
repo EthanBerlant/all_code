@@ -144,15 +144,22 @@ def should_exclude(path):
     return False
 
 
-def should_include_file(file_path):
+def should_include_file(file_path, startpath):
 
     # Determines if a file should be included based on FILES_TO_INCLUDE.
     # If FILES_TO_INCLUDE is empty, include all files.
+    # The comparison is done relative to the start directory so that
+    # providing file names works regardless of the current working directory.
 
     if not FILES_TO_INCLUDE:
         return True  # Include all files if the list is empty
-    rel_file_path = os.path.relpath(file_path)
-    return rel_file_path in FILES_TO_INCLUDE
+
+    # Compute the path relative to the directory being scanned.  This
+    # prevents mismatches when the script is executed from a different
+    # working directory than the one specified with --directory.
+    rel_file_path = os.path.relpath(file_path, startpath)
+    base_name = os.path.basename(file_path)
+    return rel_file_path in FILES_TO_INCLUDE or base_name in FILES_TO_INCLUDE
 
 
 def parse_arguments():
@@ -268,7 +275,7 @@ def main():
             # Get relative path for exclusion and headers
             rel_file_path = os.path.relpath(file_path, startpath)
 
-            if should_exclude(rel_file_path) or not should_include_file(file_path):
+            if should_exclude(rel_file_path) or not should_include_file(file_path, startpath):
                 continue  # Skip excluded files or those not in FILES_TO_INCLUDE
 
             header = f"\n\n# ======================\n# File: {rel_file_path}\n# ======================\n\n"
