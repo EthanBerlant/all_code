@@ -178,6 +178,7 @@ if __name__ == "__main__":
     test_default_output()
     test_override_output_file()
     test_include_files()
+    test_include_files_different_cwd()
     test_extensions()
     test_exclude_dirs()
     print("All tests passed!")
